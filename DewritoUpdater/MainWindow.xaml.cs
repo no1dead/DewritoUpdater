@@ -20,7 +20,7 @@ using MahApps.Metro;
 using MahApps.Metro.Controls;
 using Newtonsoft.Json.Linq;
 
-namespace Dewritwo
+namespace DewritoUpdater
 {
 	public partial class MainWindow
 	{
@@ -28,6 +28,7 @@ namespace Dewritwo
 
 		private Dictionary<int, string> _doritoKey;
 		private bool _updateText = true;
+		private bool skipUpdate = false;
 		private string _keyValue;
 		private string _eldoritoLatestVersion;
 		private FileVersionInfo _eldoritoVersion;
@@ -269,12 +270,21 @@ namespace Dewritwo
 
 			AppendDebugLine("An update is available. (" + _latestUpdateVersion + ")", Color.FromRgb(255, 255, 0));
 
-			BtnAction.Dispatcher.Invoke(
-			  () =>
-			  {
-				  BtnAction.Content = "Update";
-				  fade.Stop(); // Start animation
-			  });
+			if (!skipUpdate)
+			{
+				BtnAction.Dispatcher.Invoke(
+				  () =>
+				  {
+					  BtnAction.Content = "Update";
+					  fade.Stop(); // Start animation
+				  });
+				BtnSkip.Dispatcher.Invoke(
+				  () =>
+				  {
+					  BtnSkip.Content = "Ignore";
+					  BtnSkip.Visibility = Visibility.Visible;
+				  });
+			}
 		}
 
 		private bool ProcessUpdateData()
@@ -581,15 +591,18 @@ namespace Dewritwo
 				catch
 				{
 					AppendDebugLine("Game file validation Error", Color.FromRgb(255, 0, 0));
-					Dispatcher.Invoke(() =>
+					if (!skipUpdate)
 					{
-						BtnAction.Content = "Error";
-						BtnSkip.Content = "Ignore";
-						if (Cfg.LauncherConfigFile.ContainsKey("Launcher.AutoDebug") && Cfg.LauncherConfigFile["Launcher.AutoDebug"] == "0")
+						Dispatcher.Invoke(() =>
 						{
-							FlyoutHandler(FlyoutDebug);
-						}
-					});
+							BtnAction.Content = "Error";
+							BtnSkip.Content = "Ignore";
+							if (Cfg.LauncherConfigFile.ContainsKey("Launcher.AutoDebug") && Cfg.LauncherConfigFile["Launcher.AutoDebug"] == "0")
+							{
+								FlyoutHandler(FlyoutDebug);
+							}
+						});
+					}
 				}
 			}
 		}
@@ -800,22 +813,22 @@ namespace Dewritwo
 
 		private void BTNSkip_OnClick(object sender, RoutedEventArgs e)
 		{
+			skipUpdate = true;
+			_validateThread.Abort();
 			if (BtnSkip.Content.Equals("Ignore"))
 			{
 				AppendDebugLine("Error ignored. You may now play (with possibility of problems)", Color.FromRgb(255, 255, 255));
-			}
-			else
-			{
-				if (BtnSkip.Content.Equals("Skip"))
-				{
-					AppendDebugLine("Validating skipped. You may now play (with possibility of problems)",
-					  Color.FromRgb(255, 255, 255));
-				}
-				var fade = (Storyboard)TryFindResource("Fade");
-				fade.Stop();
 				BtnAction.Content = "Play Game";
 				BtnSkip.Visibility = Visibility.Hidden;
 			}
+			else if (BtnSkip.Content.Equals("Skip"))
+			{
+				AppendDebugLine("Validating skipped. You may now play (with possibility of problems)", Color.FromRgb(255, 255, 255));
+			}
+			var fade = (Storyboard)TryFindResource("Fade");
+			fade.Stop();
+			BtnAction.Content = "Play Game";
+			BtnSkip.Visibility = Visibility.Hidden;
 		}
 
 		private void Reddit_OnClick(object sender, RoutedEventArgs e)
@@ -823,14 +836,9 @@ namespace Dewritwo
 			Process.Start("https://www.reddit.com/r/HaloOnline/");
 		}
 
-		private void Twitter_OnClick(object sender, RoutedEventArgs e)
-		{
-			Process.Start("https://twitter.com/FishPhdOfficial");
-		}
-
 		private void Github_OnClick(object sender, RoutedEventArgs e)
 		{
-			Process.Start("https://github.com/no1dead/DewritoUpdater");
+			Process.Start("https://github.com/ElDewrito/ElDorito");
 		}
 
 		#endregion
@@ -1561,12 +1569,12 @@ namespace Dewritwo
 		{
 			//Customization
 			NameBox.Text = Cfg.GetConfigVariable("Player.Name", "");
-			Weapon.SelectedValue = Cfg.GetConfigVariable("Player.RenderWeapon", "assault_rifle");
-			Helmet.SelectedValue = Cfg.GetConfigVariable("Player.Armor.Helmet", "air_assault");
-			Chest.SelectedValue = Cfg.GetConfigVariable("Player.Armor.Chest", "air_assault");
-			Shoulders.SelectedValue = Cfg.GetConfigVariable("Player.Armor.Shoulders", "air_assault");
-			Arms.SelectedValue = Cfg.GetConfigVariable("Player.Armor.Arms", "air_assault");
-			Legs.SelectedValue = Cfg.GetConfigVariable("Player.Armor.Legs", "air_assault");
+			Weapon.SelectedIndex = Dictionaries.GetWeapons().Values.ToList().IndexOf(Cfg.GetConfigVariable("Player.RenderWeapon", "assault_rifle"));
+			Helmet.SelectedIndex = Dictionaries.GetArmor().Values.ToList().IndexOf(Cfg.GetConfigVariable("Player.Armor.Helmet", "air_assault"));
+			Chest.SelectedIndex = Dictionaries.GetArmor().Values.ToList().IndexOf(Cfg.GetConfigVariable("Player.Armor.Chest", "air_assault"));
+			Shoulders.SelectedIndex = Dictionaries.GetArmor().Values.ToList().IndexOf(Cfg.GetConfigVariable("Player.Armor.Shoulders", "air_assault"));
+			Arms.SelectedIndex = Dictionaries.GetArmor().Values.ToList().IndexOf(Cfg.GetConfigVariable("Player.Armor.Arms", "air_assault"));
+			Legs.SelectedIndex = Dictionaries.GetArmor().Values.ToList().IndexOf(Cfg.GetConfigVariable("Player.Armor.Legs", "air_assault"));
 			var convertFromString1 = ColorConverter.ConvertFromString(Cfg.GetConfigVariable("Player.Colors.Primary", "#000000"));
 			if (convertFromString1 != null)
 				ClrPrimary.SelectedColor = (Color)convertFromString1;
@@ -1594,8 +1602,8 @@ namespace Dewritwo
 			//Launcher Settings
 			try
 			{
-				Colors.SelectedValue = Cfg.LauncherConfigFile["Launcher.Color"];
-				Themes.SelectedValue = Cfg.LauncherConfigFile["Launcher.Theme"];
+				Colors.SelectedIndex = Dictionaries.GetColor().Values.ToList().IndexOf(Cfg.LauncherConfigFile["Launcher.Color"]);
+				Themes.SelectedIndex = Dictionaries.GetTheme().Values.ToList().IndexOf(Cfg.LauncherConfigFile["Launcher.Theme"]);
 				Launch.IsChecked = Convert.ToBoolean(Convert.ToInt32(Cfg.LauncherConfigFile["Launcher.Close"]));
 				RandomCheck.IsChecked = Convert.ToBoolean(Convert.ToInt32(Cfg.LauncherConfigFile["Launcher.Random"]));
 				AutoDebug.IsChecked = Convert.ToBoolean(Convert.ToInt32(Cfg.LauncherConfigFile["Launcher.AutoDebug"]));
